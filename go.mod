@@ -1,4 +1,4 @@
-module github.com/Roninchen/v5sdk_go
+module github.com/Roninchen/OKEX_V5SDK_GO
 
 go 1.15
 
