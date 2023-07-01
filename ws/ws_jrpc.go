@@ -2,9 +2,9 @@ package ws
 
 import (
 	"context"
+	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wImpl"
 	"log"
 	"time"
-	. "v5sdk_go/ws/wImpl"
 )
 
 /*
