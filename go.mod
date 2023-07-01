@@ -1,4 +1,4 @@
-module v5sdk_go
+module github.com/Roninchen/v5sdk_go
 
 go 1.15
 
