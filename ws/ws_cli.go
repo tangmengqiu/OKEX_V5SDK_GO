@@ -343,7 +343,7 @@ func (a *WsClient) receive() {
 			}
 		}
 
-		log.Println("[收到消息]", string(txtMsg))
+		//log.Println("[收到消息]", string(txtMsg))
 
 		//发送结果到默认消息处理通道
 
