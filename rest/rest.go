@@ -308,6 +308,7 @@ func (this *RESTAPI) SetHeaders(request *http.Request, timestamp string, sign st
 /*
 	打印header信息
 */
+// TODO so annoying, set it to debug level log
 func (this *RESTAPI) PrintRequest(request *http.Request, body string, preHash string) {
 	if this.ApiKeyInfo.SecKey != "" {
 		fmt.Println("  Secret-Key: " + this.ApiKeyInfo.SecKey)

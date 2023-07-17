@@ -3,14 +3,15 @@ package ws
 import (
 	"context"
 	"errors"
+	"log"
+	"sync"
+	"time"
+
 	. "github.com/Roninchen/OKEX_V5SDK_GO/config"
 	"github.com/Roninchen/OKEX_V5SDK_GO/rest"
 	. "github.com/Roninchen/OKEX_V5SDK_GO/utils"
 	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wImpl"
 	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wInterface"
-	"log"
-	"sync"
-	"time"
 )
 
 /*
@@ -40,12 +41,14 @@ func (a *WsClient) Ping(timeOut ...int) (res bool, detail *ProcessDetail, err er
 	detail.Data = msg
 
 	if len(msg) == 0 {
+		log.Println("心跳检测返回异常 msg为空")
 		res = false
 		return
 	}
 
 	str := string(msg[0].Info.([]byte))
 	if str != "pong" {
+		log.Printf("心跳检测返回异常 expect: pong, got:%s", str)
 		res = false
 		return
 	}
@@ -454,6 +457,7 @@ func (a *WsClient) PubChannel(evtId Event, op string, params []map[string]string
 	// 参数校验
 	pa, err := checkParams(evtId, params, pd)
 	if err != nil {
+		log.Printf("checkParams error: %s", err.Error())
 		return
 	}
 
@@ -473,7 +477,7 @@ func (a *WsClient) PubChannel(evtId Event, op string, params []map[string]string
 	msg, err = a.process(ctx, evtId, req)
 	if err != nil {
 		res = false
-		log.Println("处理请求失败!", req, err)
+		log.Printf("处理请求失败! req:%v, err: %v", req, err.Error())
 		return
 	}
 
@@ -481,6 +485,7 @@ func (a *WsClient) PubChannel(evtId Event, op string, params []map[string]string
 
 	res, err = checkResult(req, msg)
 	if err != nil {
+		log.Printf("checkResult error: %s", err.Error())
 		res = false
 		return
 	}

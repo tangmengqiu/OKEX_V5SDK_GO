@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	. "github.com/Roninchen/OKEX_V5SDK_GO/config"
-	. "github.com/Roninchen/OKEX_V5SDK_GO/utils"
-	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wImpl"
 	"log"
 	"regexp"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	. "github.com/Roninchen/OKEX_V5SDK_GO/config"
+	. "github.com/Roninchen/OKEX_V5SDK_GO/utils"
+	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wImpl"
 
 	"github.com/gorilla/websocket"
 )
@@ -201,45 +202,68 @@ func (a *WsClient) Start() error {
 		return nil
 	} else {
 		a.lock.RUnlock()
-		a.lock.Lock()
-		defer a.lock.Unlock()
-		// 增加超时处理
-		done := make(chan struct{})
-		ctx, cancel := context.WithTimeout(context.Background(), a.dailTimeout)
-		defer cancel()
-		go func(ctx context.Context) {
-			defer func() {
-				close(done)
-			}()
-			var c *websocket.Conn
-			c, _, err := websocket.DefaultDialer.Dial(a.WsEndPoint, nil)
-			if err != nil {
-				err = errors.New("dial error:" + err.Error())
-				return
-			}
-			a.conn = c
-
-		}(ctx)
-		select {
-		case <-ctx.Done():
-			err := errors.New("连接超时退出！")
+		if err := a.WsConnect(); err != nil {
 			return err
-		case <-done:
-
 		}
-
 		go a.receive()
 		go a.work()
-		a.isStarted = true
-		log.Println("客户端已启动!", a.WsEndPoint)
 		return nil
 	}
+}
+
+func (a *WsClient) WsConnect() error {
+
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	// 增加超时处理
+	done := make(chan struct{})
+	ctx, cancel := context.WithTimeout(context.Background(), a.dailTimeout)
+	defer cancel()
+	go func(ctx context.Context) {
+		defer func() {
+			close(done)
+		}()
+		var c *websocket.Conn
+		c, _, err := websocket.DefaultDialer.Dial(a.WsEndPoint, nil)
+		if err != nil {
+			err = errors.New("dial error:" + err.Error())
+			return
+		}
+		a.conn = c
+
+	}(ctx)
+	select {
+	case <-ctx.Done():
+		err := errors.New("连接超时退出！")
+		return err
+	case <-done:
+
+	}
+	a.isStarted = true
+	log.Println("客户端已启动!", a.WsEndPoint)
+	return nil
 }
 
 // 客户端退出消息channel
 func (a *WsClient) IsQuit() <-chan struct{} {
 	return a.quitCh
 }
+
+// OKX 官方文档 https://www.okx.com/docs-v5/zh/#overview-websocket-overview
+
+// 如果出现网络问题，系统会自动断开连接
+
+// 如果连接成功后30s未订阅或订阅后30s内服务器未向用户推送数据，系统会自动断开连接
+
+// 为了保持连接有效且稳定，建议您进行以下操作：
+
+// 1. 每次接收到消息后，用户设置一个定时器，定时N秒，N 小于30。
+
+// 2. 如果定时器被触发（N 秒内没有收到新消息），发送字符串 'ping'。
+
+// 3. 期待一个文字字符串'pong'作为回应。如果在 N秒内未收到，请发出错误或重新连接。
+
+const OKXWebsocketTimeout = 10
 
 func (a *WsClient) work() {
 	defer func() {
@@ -252,18 +276,30 @@ func (a *WsClient) work() {
 
 	}()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(OKXWebsocketTimeout * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C: // 保持心跳
-			// go a.Ping(1000)
 			go func() {
-				_, _, err := a.Ping(5000)
-				if err != nil {
-					fmt.Println("心跳检测失败！", err)
-					a.Stop()
+				b, _, err := a.Ping(OKXWebsocketTimeout * 1000)
+				if !b || err != nil {
+					log.Println("心跳检测失败！", err)
+					log.Println("尝试重新连接！")
+					// 最多重试1万次，每次间隔5秒
+					for i := 0; i < 10000; i++ {
+						err = a.WsConnect()
+						if err != nil {
+							// TODO: push to critical error channel
+							log.Printf("okx ws重连第：%d 次失败！:%v", i+1, err.Error())
+							time.Sleep(time.Second * 5)
+							continue
+						}
+						// TODO: push to critical error channel
+						log.Println("okx ws重连成功！")
+						break
+					}
 					return
 				}
 

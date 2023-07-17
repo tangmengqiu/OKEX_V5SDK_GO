@@ -2,10 +2,12 @@ package ws
 
 import (
 	"errors"
-	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wImpl"
-	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wInterface"
+	"fmt"
 	"log"
 	"runtime/debug"
+
+	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wImpl"
+	. "github.com/Roninchen/OKEX_V5SDK_GO/ws/wInterface"
 )
 
 // 判断返回结果成功失败
@@ -57,11 +59,13 @@ func checkResult(wsReq WSReqData, wsRsps []*Msg) (res bool, err error) {
 				}
 			}
 			if !ok {
-				err = errors.New("未得到所有的期望的返回结果")
+				errMsg:= fmt.Sprintf("未得到所有的期望的返回结果: %s", i_req["instId"])
+				err = errors.New(errMsg)
 				return
 			}
 		}
 	} else {
+		log.Printf("订阅检查校验，expect: %v, actual: %v", MSG_NORMAL, wsReq.GetType())
 		for i, _ := range wsRsps {
 			info, _ := wsRsps[i].Info.(JRPCRsp)
 			if info.Code != "0" {
