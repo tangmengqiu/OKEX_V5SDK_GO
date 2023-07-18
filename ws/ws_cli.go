@@ -238,6 +238,7 @@ func (a *WsClient) WsConnect() error {
 	select {
 	case <-ctx.Done():
 		err := errors.New("连接超时退出！")
+		a.isConnecting = false
 		return err
 	case <-done:
 
@@ -292,19 +293,14 @@ func (a *WsClient) work() {
 					log.Println("心跳检测失败！", err)
 					if !a.isConnecting {
 						log.Println("尝试重新连接！")
-						// 最多重试1万次，每次间隔5秒
-						for i := 0; i < 10000; i++ {
-							err = a.WsConnect()
-							if err != nil {
-								// TODO: push to critical error channel
-								log.Printf("okx ws重连第：%d 次失败！:%v", i+1, err.Error())
-								time.Sleep(time.Second * 5)
-								continue
-							}
+						err = a.WsConnect()
+						if err != nil {
 							// TODO: push to critical error channel
-							log.Println("okx ws重连成功！")
-							break
+							log.Printf("okx ws重连失败！:%v", err.Error())
+							return
 						}
+						// TODO: push to critical error channel
+						log.Println("okx ws重连成功！")
 					}
 
 					return
