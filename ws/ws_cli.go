@@ -51,8 +51,9 @@ type WsClient struct {
 	autoDepthMgr  bool // 深度数据管理（checksum等）
 	DepthDataLock sync.RWMutex
 
-	isStarted   bool //防止重复启动和关闭
-	dailTimeout time.Duration
+	isStarted    bool //防止重复启动和关闭
+	isConnecting bool //标记ws正在连接
+	dailTimeout  time.Duration
 }
 
 /*
@@ -215,6 +216,8 @@ func (a *WsClient) WsConnect() error {
 
 	a.lock.Lock()
 	defer a.lock.Unlock()
+	// 重连标识'
+	a.isConnecting = true
 	// 增加超时处理
 	done := make(chan struct{})
 	ctx, cancel := context.WithTimeout(context.Background(), a.dailTimeout)
@@ -240,6 +243,7 @@ func (a *WsClient) WsConnect() error {
 
 	}
 	a.isStarted = true
+	a.isConnecting = false
 	log.Println("客户端已启动!", a.WsEndPoint)
 	return nil
 }
@@ -286,20 +290,23 @@ func (a *WsClient) work() {
 				b, _, err := a.Ping(OKXWebsocketTimeout * 1000)
 				if !b || err != nil {
 					log.Println("心跳检测失败！", err)
-					log.Println("尝试重新连接！")
-					// 最多重试1万次，每次间隔5秒
-					for i := 0; i < 10000; i++ {
-						err = a.WsConnect()
-						if err != nil {
+					if !a.isConnecting {
+						log.Println("尝试重新连接！")
+						// 最多重试1万次，每次间隔5秒
+						for i := 0; i < 10000; i++ {
+							err = a.WsConnect()
+							if err != nil {
+								// TODO: push to critical error channel
+								log.Printf("okx ws重连第：%d 次失败！:%v", i+1, err.Error())
+								time.Sleep(time.Second * 5)
+								continue
+							}
 							// TODO: push to critical error channel
-							log.Printf("okx ws重连第：%d 次失败！:%v", i+1, err.Error())
-							time.Sleep(time.Second * 5)
-							continue
+							log.Println("okx ws重连成功！")
+							break
 						}
-						// TODO: push to critical error channel
-						log.Println("okx ws重连成功！")
-						break
 					}
+
 					return
 				}
 
