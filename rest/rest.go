@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	. "github.com/Roninchen/OKEX_V5SDK_GO/utils"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -51,9 +52,9 @@ type Okexv5APIResponse struct {
 }
 
 /*
-	endPoint:请求地址
-	apiKey
-	isSimulate: 是否为模拟环境
+endPoint:请求地址
+apiKey
+isSimulate: 是否为模拟环境
 */
 func NewRESTClient(endPoint string, apiKey *APIKeyInfo, isSimulate bool) *RESTAPI {
 
@@ -119,7 +120,7 @@ func (this *RESTAPI) SetTimeOut(timeout time.Duration) *RESTAPI {
 }
 
 // GET请求
-func (this *RESTAPI) Get(ctx context.Context, uri string, param *map[string]interface{}) (res *RESTAPIResult, err error) {
+func (this *RESTAPI) Get(logger *zap.Logger, ctx context.Context, uri string, param *map[string]interface{}) (res *RESTAPIResult, err error) {
 	this.Method = GET
 	this.Uri = uri
 
@@ -129,11 +130,11 @@ func (this *RESTAPI) Get(ctx context.Context, uri string, param *map[string]inte
 		reqParam = *param
 	}
 	this.Param = reqParam
-	return this.Run(ctx)
+	return this.Run(logger, ctx)
 }
 
 // POST请求
-func (this *RESTAPI) Post(ctx context.Context, uri string, param *map[string]interface{}) (res *RESTAPIResult, err error) {
+func (this *RESTAPI) Post(logger *zap.Logger, ctx context.Context, uri string, param *map[string]interface{}) (res *RESTAPIResult, err error) {
 	this.Method = POST
 	this.Uri = uri
 
@@ -144,10 +145,10 @@ func (this *RESTAPI) Post(ctx context.Context, uri string, param *map[string]int
 	}
 	this.Param = reqParam
 
-	return this.Run(ctx)
+	return this.Run(logger, ctx)
 }
 
-func (this *RESTAPI) Run(ctx context.Context) (res *RESTAPIResult, err error) {
+func (this *RESTAPI) Run(logger *zap.Logger, ctx context.Context) (res *RESTAPIResult, err error) {
 
 	if this.ApiKeyInfo == nil {
 		err = errors.New("APIKey不可为空")
@@ -197,10 +198,10 @@ func (this *RESTAPI) Run(ctx context.Context) (res *RESTAPIResult, err error) {
 	headStr := this.SetHeaders(req, timestamp, sign)
 	res.Header = headStr
 
-	this.PrintRequest(req, body, preHash)
+	this.PrintRequest(logger, req, body, preHash)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("请求失败！", err)
+		logger.Error("请求失败！", zap.String("error", err.Error()))
 		return
 	}
 	defer resp.Body.Close()
@@ -209,7 +210,7 @@ func (this *RESTAPI) Run(ctx context.Context) (res *RESTAPIResult, err error) {
 
 	resBuff, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("获取请求结果失败！", err)
+		logger.Error("获取请求结果失败！", zap.String("error", err.Error()))
 		return
 	}
 
@@ -220,7 +221,7 @@ func (this *RESTAPI) Run(ctx context.Context) (res *RESTAPIResult, err error) {
 	var v5rsp Okexv5APIResponse
 	err = json.Unmarshal(resBuff, &v5rsp)
 	if err != nil {
-		fmt.Println("解析v5返回失败！", err)
+		logger.Error("解析v5返回失败！", zap.String("error", err.Error()))
 		return
 	}
 
@@ -230,7 +231,7 @@ func (this *RESTAPI) Run(ctx context.Context) (res *RESTAPIResult, err error) {
 }
 
 /*
-	生成请求对应的参数
+生成请求对应的参数
 */
 func (this *RESTAPI) GenReqInfo() (uri string, body string, err error) {
 	uri = this.Uri
@@ -265,14 +266,14 @@ func (this *RESTAPI) GenReqInfo() (uri string, body string, err error) {
 }
 
 /*
-   Set http request headers:
-   Accept: application/json
-   Content-Type: application/json; charset=UTF-8  (default)
-   Cookie: locale=en_US        (English)
-   OK-ACCESS-KEY: (Your setting)
-   OK-ACCESS-SIGN: (Use your setting, auto sign and add)
-   OK-ACCESS-TIMESTAMP: (Auto add)
-   OK-ACCESS-PASSPHRASE: Your setting
+Set http request headers:
+Accept: application/json
+Content-Type: application/json; charset=UTF-8  (default)
+Cookie: locale=en_US        (English)
+OK-ACCESS-KEY: (Your setting)
+OK-ACCESS-SIGN: (Use your setting, auto sign and add)
+OK-ACCESS-TIMESTAMP: (Auto add)
+OK-ACCESS-PASSPHRASE: Your setting
 */
 func (this *RESTAPI) SetHeaders(request *http.Request, timestamp string, sign string) (header string) {
 
@@ -306,26 +307,26 @@ func (this *RESTAPI) SetHeaders(request *http.Request, timestamp string, sign st
 }
 
 /*
-	打印header信息
+打印header信息
 */
-func (this *RESTAPI) PrintRequest(request *http.Request, body string, preHash string) {
+func (this *RESTAPI) PrintRequest(logger *zap.Logger, request *http.Request, body string, preHash string) {
 	if this.ApiKeyInfo.SecKey != "" {
-		fmt.Println("  Secret-Key: " + this.ApiKeyInfo.SecKey)
+		logger.Info("  Secret-Key: " + this.ApiKeyInfo.SecKey)
 	}
-	fmt.Println("  Request(" + IsoTime() + "):")
-	fmt.Println("\tUrl: " + request.URL.String())
-	fmt.Println("\tMethod: " + strings.ToUpper(request.Method))
+	logger.Info("  Request(" + IsoTime() + "):")
+	logger.Info("\tUrl: " + request.URL.String())
+	logger.Info("\tMethod: " + strings.ToUpper(request.Method))
 	if len(request.Header) > 0 {
-		fmt.Println("\tHeaders: ")
+		logger.Info("\tHeaders: ")
 		for k, v := range request.Header {
 			if strings.Contains(k, "Ok-") {
 				k = strings.ToUpper(k)
 			}
-			fmt.Println("\t\t" + k + ": " + v[0])
+			logger.Info("\t\t" + k + ": " + v[0])
 		}
 	}
-	fmt.Println("\tBody: " + body)
+	logger.Info("\tBody: " + body)
 	if preHash != "" {
-		fmt.Println("  PreHash: " + preHash)
+		logger.Info("  PreHash: " + preHash)
 	}
 }
