@@ -5,6 +5,7 @@ import (
 	"fmt"
 	. "github.com/Roninchen/OKEX_V5SDK_GO/rest"
 	. "github.com/Roninchen/OKEX_V5SDK_GO/ws"
+	"go.uber.org/zap"
 	"log"
 	"time"
 )
@@ -23,20 +24,20 @@ func REST() {
 
 	// 第三个参数代表是否为模拟环境，更多信息查看接口说明
 	cli := NewRESTClient("https://www.okex.win", &apikey, true)
-	rsp, err := cli.Get(context.Background(), "/api/v5/account/balance", nil)
+	rsp, err := cli.Get(logger, context.Background(), "/api/v5/account/balance", nil)
 	if err != nil {
 		return
 	}
 
-	fmt.Println("Response:")
-	fmt.Println("\thttp code: ", rsp.Code)
-	fmt.Println("\t总耗时: ", rsp.TotalUsedTime)
-	fmt.Println("\t请求耗时: ", rsp.ReqUsedTime)
-	fmt.Println("\t返回消息: ", rsp.Body)
-	fmt.Println("\terrCode: ", rsp.V5Response.Code)
-	fmt.Println("\terrMsg: ", rsp.V5Response.Msg)
-	fmt.Println("\tdata: ", rsp.V5Response.Data)
-
+	logger.Info("Response:",
+		zap.Int("http code: ", rsp.Code),
+		zap.Duration("总耗时: ", rsp.TotalUsedTime),
+		zap.Duration("请求耗时: ", rsp.ReqUsedTime),
+		zap.String("返回消息: ", rsp.Body),
+		zap.String("errCode: ", rsp.V5Response.Code),
+		zap.String("errMsg: ", rsp.V5Response.Msg),
+		zap.Any("data: ", rsp.V5Response.Data),
+	)
 }
 
 // 订阅私有频道
@@ -215,4 +216,11 @@ func main() {
 
 	// rest请求
 	REST()
+}
+
+var logger *zap.Logger
+
+func init() {
+	logger, _ = zap.NewProduction()
+	defer logger.Sync()
 }

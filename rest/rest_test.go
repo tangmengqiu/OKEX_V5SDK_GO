@@ -3,18 +3,22 @@ package rest
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 	"testing"
 )
 
+var testLogger *zap.Logger
+
 /*
-	GET请求
+GET请求
 */
 func TestRESTAPIGet(t *testing.T) {
-
+	testLogger, _ = zap.NewProduction()
+	defer testLogger.Sync()
 	rest := NewRESTAPI("https://www.okex.win", GET, "/api/v5/account/balance", nil)
 	rest.SetSimulate(true).SetAPIKey("xxxx", "xxxx", "xxxx")
 	rest.SetUserId("xxxxx")
-	response, err := rest.Run(context.Background())
+	response, err := rest.Run(testLogger, context.Background())
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -37,7 +41,7 @@ func TestRESTAPIGet(t *testing.T) {
 	}
 
 	cli := NewRESTClient("https://www.okex.win", &apikey, true)
-	rsp, err := cli.Get(context.Background(), "/api/v5/account/balance", nil)
+	rsp, err := cli.Get(testLogger, context.Background(), "/api/v5/account/balance", nil)
 	if err != nil {
 		return
 	}
@@ -53,15 +57,18 @@ func TestRESTAPIGet(t *testing.T) {
 }
 
 /*
-	POST请求
+POST请求
 */
 func TestRESTAPIPost(t *testing.T) {
+	testLogger, _ = zap.NewProduction()
+	defer testLogger.Sync()
+
 	param := make(map[string]interface{})
 	param["greeksType"] = "PA"
 
 	rest := NewRESTAPI("https://www.okex.win", POST, "/api/v5/account/set-greeks", &param)
 	rest.SetSimulate(true).SetAPIKey("xxxx", "xxxx", "xxxx")
-	response, err := rest.Run(context.Background())
+	response, err := rest.Run(testLogger, context.Background())
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -84,7 +91,7 @@ func TestRESTAPIPost(t *testing.T) {
 	}
 
 	cli := NewRESTClient("https://www.okex.win", &apikey, true)
-	rsp, err := cli.Post(context.Background(), "/api/v5/account/set-greeks", &param)
+	rsp, err := cli.Post(testLogger, context.Background(), "/api/v5/account/set-greeks", &param)
 	if err != nil {
 		return
 	}
